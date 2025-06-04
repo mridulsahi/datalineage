@@ -7,6 +7,7 @@ import plotly.graph_objects as go
 import networkx as nx
 import streamlit as st
 import pyodbc
+from datalineagegraph import DataLineageVisualizer
 
 
 st.set_page_config(page_title="Lineage Dashboard", layout="wide")
@@ -57,6 +58,13 @@ else:
     else:
         st.stop()
 
+df.columns=[col.lower() for col in df.columns]
+df=df.rename(columns={
+    'columnname':'column',
+    'source':'source',
+    'target':'target',
+    'job':'job'
+})
 # --- Preview Data ---
 st.subheader("Lineage Data Preview")
 st.dataframe(df.head())
@@ -72,70 +80,74 @@ if search_term:
 # --- Graph: Simple Node Graph from source/target ---
 st.subheader("Lineage Graph")
 try:
-    # Create directed graph
-    G = nx.DiGraph()
+    visualizer=DataLineageVisualizer()
+    visualizer.load_data(df)
+    fig=visualizer.create_interactive_plot()
+    st.plotly_chart(fig,use_container_width=True)
+    # # Create directed graph
+    # G = nx.DiGraph()
 
-    # Add edges
-    for _, row in df.iterrows():
-        G.add_edge(row["Source"], row["Target"], job=row.get("Job", "N/A"))
+    # # Add edges
+    # for _, row in df.iterrows():
+    #     G.add_edge(row["Source"], row["Target"], job=row.get("Job", "N/A"))
 
-    # Generate layout
-    pos = nx.spring_layout(G, seed=42)
+    # # Generate layout
+    # pos = nx.spring_layout(G, seed=42)
 
-    # Initialize edge and node trace lists
-    edge_x = []
-    edge_y = []
-    node_x = []
-    node_y = []
-    node_text = []
+    # # Initialize edge and node trace lists
+    # edge_x = []
+    # edge_y = []
+    # node_x = []
+    # node_y = []
+    # node_text = []
 
-    # Populate edge coordinates
-    for edge in G.edges():
-        x0, y0 = pos[edge[0]]
-        x1, y1 = pos[edge[1]]
+    # # Populate edge coordinates
+    # for edge in G.edges():
+    #     x0, y0 = pos[edge[0]]
+    #     x1, y1 = pos[edge[1]]
 
-        edge_x.extend([x0, x1, None])  # Use extend() instead of +=
-        edge_y.extend([y0, y1, None])
+    #     edge_x.extend([x0, x1, None])  # Use extend() instead of +=
+    #     edge_y.extend([y0, y1, None])
 
-    # Populate node coordinates
-    for node in G.nodes():
-        x, y = pos[node]
-        node_x.append(x)
-        node_y.append(y)
-        node_text.append(node)
+    # # Populate node coordinates
+    # for node in G.nodes():
+    #     x, y = pos[node]
+    #     node_x.append(x)
+    #     node_y.append(y)
+    #     node_text.append(node)
 
-    # Create edge trace
-    edge_trace = go.Scatter(
-        x=edge_x,
-        y=edge_y,
-        line=dict(width=1, color="#888"),
-        hoverinfo='none',
-        mode='lines'
-    )
+    # # Create edge trace
+    # edge_trace = go.Scatter(
+    #     x=edge_x,
+    #     y=edge_y,
+    #     line=dict(width=1, color="#888"),
+    #     hoverinfo='none',
+    #     mode='lines'
+    # )
 
-    # Create node trace
-    node_trace = go.Scatter(
-        x=node_x,
-        y=node_y,
-        text=node_text,
-        mode='markers+text',
-        marker=dict(size=20, color='skyblue', line_width=2),
-        textposition="bottom center"
-    )
+    # # Create node trace
+    # node_trace = go.Scatter(
+    #     x=node_x,
+    #     y=node_y,
+    #     text=node_text,
+    #     mode='markers+text',
+    #     marker=dict(size=20, color='skyblue', line_width=2),
+    #     textposition="bottom center"
+    # )
 
-    # Create the figure
-    fig = go.Figure(data=[edge_trace, node_trace],
-                    layout=go.Layout(
-                        showlegend=False,
-                        hovermode='closest',
-                        margin=dict(b=20, l=20, r=20, t=40),
-                        xaxis=dict(showgrid=False, zeroline=False),
-                        yaxis=dict(showgrid=False, zeroline=False)
-                    )
-                )
+    # # Create the figure
+    # fig = go.Figure(data=[edge_trace, node_trace],
+    #                 layout=go.Layout(
+    #                     showlegend=False,
+    #                     hovermode='closest',
+    #                     margin=dict(b=20, l=20, r=20, t=40),
+    #                     xaxis=dict(showgrid=False, zeroline=False),
+    #                     yaxis=dict(showgrid=False, zeroline=False)
+    #                 )
+    #             )
 
-    # Display the graph
-    st.plotly_chart(fig, use_container_width=True)
+    # # Display the graph
+    # st.plotly_chart(fig, use_container_width=True)
 
 except Exception as e:
     st.error(f"Could not generate graph: {e}")
