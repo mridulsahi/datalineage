@@ -3,6 +3,7 @@ import networkx as nx
 import plotly.graph_objects as go
 import plotly.express as px
 import math
+from collections import deque
 
 class DataLineageVisualizer:
     def __init__(self):
@@ -11,7 +12,6 @@ class DataLineageVisualizer:
         self.node_levels = {}
 
     def load_data(self, data):
-        """Load and process the lineage data."""
         if isinstance(data, str):
             self.df = pd.read_csv(data)
         else:
@@ -19,7 +19,6 @@ class DataLineageVisualizer:
 
         self.df = self.df.dropna()
         self.df.columns = [col.lower() for col in self.df.columns]
-
         self.df['source'] = self.df['source'].astype(str).str.strip()
         self.df['target'] = self.df['target'].astype(str).str.strip()
         self.df['column'] = self.df['column'].astype(str).str.strip()
@@ -29,13 +28,11 @@ class DataLineageVisualizer:
     def build_graph(self, filtered_df=None):
         df_to_use = filtered_df if filtered_df is not None else self.df
         self.graph.clear()
-
         for _, row in df_to_use.iterrows():
             s, t, col, job = row['source'], row['target'], row['column'], row['job']
             self.graph.add_node(s)
             self.graph.add_node(t)
             self.graph.add_edge(s, t, column=col, job=job)
-
         self._calculate_node_levels()
 
     def _calculate_node_levels(self):
@@ -48,7 +45,6 @@ class DataLineageVisualizer:
             self._calculate_levels_with_cycles()
 
     def _calculate_levels_with_cycles(self):
-        from collections import deque
         self.node_levels = {}
         roots = [n for n in self.graph.nodes if self.graph.in_degree(n) == 0]
         if not roots:
@@ -89,23 +85,30 @@ class DataLineageVisualizer:
         pos = self._create_layout()
         fig = go.Figure()
 
-        # Add nodes
+        node_color = "#1f77b4"
         for node in self.graph.nodes:
             x, y = pos[node]
-            in_deg = self.graph.in_degree(node)
-            out_deg = self.graph.out_degree(node)
-            hover = f"<b>{node}</b><br>In: {in_deg} | Out: {out_deg}"
-            fig.add_shape(type="rect", x0=x-0.8, y0=y-0.4, x1=x+0.8, y1=y+0.4,
-                          fillcolor="#3498db", line=dict(color="white"))
-            fig.add_trace(go.Scatter(x=[x], y=[y], mode='text',
-                                     text=[node], hoverinfo='text',
-                                     hovertemplate=hover, textposition="middle center",
-                                     showlegend=False))
 
-        # Add edges
+            # Draw rectangle for the node
+            fig.add_shape(type="rect", x0=x-0.8, y0=y-0.4, x1=x+0.8, y1=y+0.4,
+                          fillcolor=node_color, line=dict(color="white"))
+
+            # Draw label above the rectangle
+            fig.add_trace(go.Scatter(
+                x=[x],
+                y=[y + 0.5],  # label positioned slightly above box
+                mode='text',
+                text=[node],
+                textposition="top center",
+                textfont=dict(size=12, color="black"),
+                hoverinfo='skip',
+                showlegend=False
+            ))
+
         edge_colors = px.colors.qualitative.Set3
         job_list = list(self.df['job'].unique())
         job_color_map = {job: edge_colors[i % len(edge_colors)] for i, job in enumerate(job_list)}
+
         for u, v, data in self.graph.edges(data=True):
             x0, y0 = pos[u]
             x1, y1 = pos[v]
